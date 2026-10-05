@@ -18,7 +18,7 @@ pour chaque thème
 4) publication des collections de données par thème (dans un tableau Grist et/ou en tant que collection dans ecologie.data.gouv)
 5) envoi de messages aux producteurs de données (retour sur la qualité des méta-données)
 
-Le projet est [documenté dans le wiki](https://github.com/CEREMA/catalogue-datagouv-mobi/wiki/Documentation).
+Le projet est [documenté dans le wiki]([https://github.com/CEREMA/catalogue-datagouv-mobi/wiki/Documentation](https://github.com/CEREMA/catalogue-datagouv-mobi/wiki)).
 
 
 #### inspiration de flowdatagouv
