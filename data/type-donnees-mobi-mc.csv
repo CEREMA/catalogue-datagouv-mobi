@@ -19,7 +19,7 @@ Offre,Mobilité partagée,Mobilité partagée,Stations et services d’autoparta
 Offre,"Fret, logistique ","Fret, logistique ",Entrepôts,"entrepot, logistique, zones-logistiques, fret, plateforme-logistique","entrepôt, espace logistique, zone logistique, plate-forme logistique"
 Offre,"Fret, logistique ","Fret, logistique ",Aires de livraison,"livraison, aires-de-livraison, livraison-urbaine, fret","aires de livraison, stationnement livraison, réglementation livraison, dialog, fret urbain, logistique urbaine"
 Offre,Véhicules,Véhicules,Parc de véhicules,"loi-lom, flotte-automobile, parc-automobile, vehicule-faible-emission, verdissement-flotte, renouvellement, irve, borne-de-recharge","parc automobile, parc véhicules, flottes"
-,Véhicules,Véhicules,IRVE,,"bornes de recharge, IRVE"
+Offre,Véhicules,Véhicules,IRVE,"Infrastructure de recharge de véhicule électrique, recharge électrique, IRVE","bornes de recharge, IRVE"
 Demande et usage,Trafic routier ,Trafic routier ,Trafic en temps réel,"trafic, temps-reel, conditions-de-circulation, circulation","trafic routier temps réel, conditions de circulation temps réel, temps de parcours temps réel"
 Demande et usage,Trafic routier ,Trafic routier ,"Trafic historique (Comptages, débits, vitesses, temps de parcours)","comptage, comptages, comptage-et-flux, debits, vitesse, temps-de-parcours","comptages routiers, débits, trafic historique, vitesses moyennes, temps de parcours moyen"
 Demande et usage,Trafic routier ,Trafic routier ,Événements de circulation,"evenements-de-circulation, arretes-circulation, arretes-circulation-voirie, travaux, perturbation","événement de circulation, travaux, perturbations"
