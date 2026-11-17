@@ -41,7 +41,7 @@ make update      # tout, rejouable (cron)
 
 | Étape         | Rôle                                                                  |
 | ------------- | --------------------------------------------------------------------- |
-| `make fetch`  | télécharge les exports data.gouv.fr du jour dans `data/catalog/`      |
+| `make fetch`  | télécharge les derniers exports data.gouv.fr dans `data/catalog/`     |
 | `make embed`  | synchronise ontologie, jeux, métadonnées ; embeddings manquants       |
 | `make attach` | `k` sous-thèmes les plus proches par jeu                              |
 | `make enrich` | catégorie juridique des producteurs (SIREN pas encore en cache)       |

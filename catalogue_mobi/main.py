@@ -59,8 +59,7 @@ from catalogue_mobi.producteurs import classification
 
 
 def fetch(args):
-    updated = fetch_catalog(force=args.force)
-    print(f"{len(updated)} export(s) mis à jour")
+    fetch_catalog()
 
 
 def embed(args, conn):
@@ -159,11 +158,6 @@ def parse_args():
         sub.set_defaults(func=func, needs_db=needs_db)
         return sub
 
-    def fetch_options(sub):
-        sub.add_argument(
-            "--force", action="store_true", help="Retélécharge même si à jour"
-        )
-
     def embed_options(sub):
         sub.add_argument("--limit", type=int, help="Ne charge que N jeux (essai)")
         sub.add_argument(
@@ -198,16 +192,13 @@ def parse_args():
             "--k", type=int, default=DEFAULT_K, help="Sous-thèmes retenus par jeu"
         )
 
-    fetch_options(
-        command("fetch", fetch, "Télécharge les exports data.gouv.fr", needs_db=False)
-    )
+    command("fetch", fetch, "Télécharge les exports data.gouv.fr", needs_db=False)
     embed_options(command("embed", embed, "Charge le catalogue et calcule les embeddings"))
     attach_options(command("attach", attach, "Rattache les jeux à l'ontologie"))
     command("enrich", enrich, "Catégorie juridique des producteurs (SIRENE)")
     command("export", export, "Écrit les tables pour Grist dans data/grist/")
     command("reset-db", reset_db, "Supprime et recrée les tables")
     sub = command("update", update, "Enchaîne toutes les étapes (cron)")
-    fetch_options(sub)
     embed_options(sub)
     attach_options(sub)
     return parser.parse_args()

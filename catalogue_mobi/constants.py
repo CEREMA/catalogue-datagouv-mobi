@@ -16,7 +16,6 @@ CATALOG_EXPORTS = {
     "export-organization": "export-organization.csv",
     "export-resource": "export-resource.csv",
 }
-CATALOG_MANIFEST = CATALOG_DIR / "manifest.json"
 DATASET_PATH = CATALOG_DIR / "export-dataset.csv"
 ORGANIZATION_PATH = CATALOG_DIR / "export-organization.csv"
 RESOURCE_PATH = CATALOG_DIR / "export-resource.csv"

@@ -1,21 +1,14 @@
-"""Téléchargement des exports quotidiens du catalogue data.gouv.fr.
+"""Téléchargement des derniers exports du catalogue data.gouv.fr.
 
-Les exports sont publiés chaque nuit comme ressources du jeu « Catalogue des
-données de data.gouv.fr », sous un nom daté (export-dataset-20261117-055149.csv).
-Ils sont enregistrés sous un nom stable dans data/catalog/, et l'URL de chaque
-fichier est notée dans manifest.json : un export déjà à jour n'est pas
-retéléchargé.
+Les exports sont republiés chaque nuit comme ressources du jeu « Catalogue
+des données de data.gouv.fr », sous un nom daté
+(export-dataset-20261117-055149.csv). Ils sont enregistrés sous un nom stable
+dans data/catalog/, en écrasant les précédents.
 """
 
-import json
 from pathlib import Path
 
-from catalogue_mobi.constants import (
-    CATALOG_API_URL,
-    CATALOG_DIR,
-    CATALOG_EXPORTS,
-    CATALOG_MANIFEST,
-)
+from catalogue_mobi.constants import CATALOG_API_URL, CATALOG_DIR, CATALOG_EXPORTS
 from catalogue_mobi.infra_http import download, get_json
 
 
@@ -37,26 +30,8 @@ def latest_export_urls(resources: list[dict]) -> dict[str, str]:
     return urls
 
 
-def _read_manifest(path: Path) -> dict:
-    return json.loads(path.read_text()) if path.exists() else {}
-
-
-def fetch_catalog(directory: Path = CATALOG_DIR, force: bool = False) -> list[str]:
-    """Télécharge les exports qui ont changé. Retourne les fichiers mis à jour."""
+def fetch_catalog(directory: Path = CATALOG_DIR) -> None:
     directory.mkdir(parents=True, exist_ok=True)
-    manifest_path = directory / CATALOG_MANIFEST.name
-    manifest = _read_manifest(manifest_path)
-    urls = latest_export_urls(get_json(CATALOG_API_URL)["resources"])
-
-    updated = []
-    for filename, url in urls.items():
-        dest = directory / filename
-        if not force and dest.exists() and manifest.get(filename) == url:
-            print(f"{filename} déjà à jour")
-            continue
+    for filename, url in latest_export_urls(get_json(CATALOG_API_URL)["resources"]).items():
         print(f"Téléchargement de {url}")
-        download(url, dest)
-        manifest[filename] = url
-        manifest_path.write_text(json.dumps(manifest, indent=2))
-        updated.append(filename)
-    return updated
+        download(url, directory / filename)
