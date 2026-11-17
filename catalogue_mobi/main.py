@@ -32,12 +32,14 @@ from catalogue_mobi.infra_postgres import (
     PostgresDatasetMatcher,
     PostgresDocumentStore,
     connect,
+    dataset_texts,
     export_view,
     init_db,
     legal_categories,
     missing_legal_category_labels,
     missing_sirens,
     save_classifications,
+    save_keyword_matches,
     save_legal_category_labels,
     save_sirens,
     update_dataset_metadata,
@@ -46,6 +48,7 @@ from catalogue_mobi.infra_postgres import (
     update_resource_stats,
 )
 from catalogue_mobi.infra_sirene import lookup_legal_categories, lookup_sirens
+from catalogue_mobi.mots_cles import KeywordIndex
 from catalogue_mobi.pipeline import (
     dataset_documents,
     dataset_metadata,
@@ -104,9 +107,14 @@ def embed(args, conn):
 
 
 def attach(args, conn):
-    print(f"Rattachement des jeux de données (k={args.k})...")
+    print(f"Rattachement par embeddings (k={args.k})...")
     count = PostgresDatasetMatcher(conn).attach(k=args.k)
     print(f"{count} rattachements enregistrés")
+
+    print("Rattachement par mots-clés...")
+    index = KeywordIndex(read_ontology())
+    matches = [m for id, text in dataset_texts(conn) for m in index.matches(id, text)]
+    print(f"{save_keyword_matches(conn, matches)} rattachements enregistrés")
 
 
 def enrich(args, conn):
@@ -194,7 +202,9 @@ def parse_args():
 
     command("fetch", fetch, "Télécharge les exports data.gouv.fr", needs_db=False)
     embed_options(command("embed", embed, "Charge le catalogue et calcule les embeddings"))
-    attach_options(command("attach", attach, "Rattache les jeux à l'ontologie"))
+    attach_options(
+        command("attach", attach, "Rattache les jeux à l'ontologie (embeddings, mots-clés)")
+    )
     command("enrich", enrich, "Catégorie juridique des producteurs (SIRENE)")
     command("export", export, "Écrit les tables pour Grist dans data/grist/")
     command("reset-db", reset_db, "Supprime et recrée les tables")

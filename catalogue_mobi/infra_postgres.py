@@ -2,6 +2,7 @@ import csv
 import io
 import os
 from pathlib import Path
+from typing import Iterable
 
 import numpy as np
 import psycopg2
@@ -12,6 +13,7 @@ from psycopg2.extras import execute_values
 from catalogue_mobi.constants import (
     DATASET_TABLE,
     EMBEDDING_DIM,
+    KEYWORD_TABLE,
     LEGAL_CATEGORY_TABLE,
     MATCH_TABLE,
     ONTOLOGY_TABLE,
@@ -90,6 +92,16 @@ CREATE TABLE IF NOT EXISTS dataset_ontology (
 );
 CREATE INDEX IF NOT EXISTS idx_dataset_ontology_distance
     ON dataset_ontology (ontology_id, distance);
+
+-- Rattachement par mots-clés (baseline) : par thème (ontology_id NULL) et
+-- par sous-thème, avec les mots-clés trouvés
+CREATE TABLE IF NOT EXISTS dataset_keyword (
+    dataset_id TEXT NOT NULL REFERENCES dataset (id) ON DELETE CASCADE,
+    theme TEXT NOT NULL,
+    ontology_id TEXT REFERENCES ontology (id) ON DELETE CASCADE,
+    keywords TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_dataset_keyword ON dataset_keyword (dataset_id);
 """
 
 # Tables à importer dans Grist (une vue par table, colonnes en français)
@@ -143,6 +155,13 @@ SELECT m.dataset_id AS jeu,
        m.rank AS rang,
        m.distance
 FROM dataset_ontology m;
+
+CREATE OR REPLACE VIEW grist_rattachements_mots_cles AS
+SELECT k.dataset_id AS jeu,
+       k.theme,
+       k.ontology_id AS sous_theme,
+       k.keywords AS mots_trouves
+FROM dataset_keyword k;
 """
 
 
@@ -157,6 +176,7 @@ def connect():
 
 
 ALL_TABLES = (
+    KEYWORD_TABLE,
     MATCH_TABLE,
     ONTOLOGY_TABLE,
     DATASET_TABLE,
@@ -329,6 +349,30 @@ class PostgresDatasetMatcher:
             count = cur.rowcount
         self._conn.commit()
         return count
+
+
+def dataset_texts(conn, batch_size: int = 5000):
+    """(id, texte) de chaque jeu en base, lus par lots (curseur serveur)."""
+    with conn.cursor(name="dataset_texts") as cur:
+        cur.itersize = batch_size
+        cur.execute("SELECT id, text FROM dataset ORDER BY id;")
+        yield from cur
+
+
+def save_keyword_matches(conn, rows: Iterable[dict]) -> int:
+    """Remplace les rattachements par mots-clés."""
+    fields = ["dataset_id", "theme", "ontology_id", "keywords"]
+    with conn.cursor() as cur:
+        cur.execute("TRUNCATE dataset_keyword;")
+        _to_staging(cur, "staging_keyword", fields, ([r[f] for f in fields] for r in rows))
+        cur.execute(
+            "INSERT INTO dataset_keyword (dataset_id, theme, ontology_id, keywords) "
+            "SELECT dataset_id, theme, NULLIF(ontology_id, ''), keywords "
+            "FROM staging_keyword;"
+        )
+        count = cur.rowcount
+    conn.commit()
+    return count
 
 
 DATASET_METADATA_FIELDS = [

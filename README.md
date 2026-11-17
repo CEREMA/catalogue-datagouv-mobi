@@ -33,14 +33,18 @@ de données du domaine mobilité/transport, puis, pour chaque thème :
 
 ## Principe
 
-Chaque jeu non archivé de data.gouv.fr (~75k) est rattaché à ses `k` sous-thèmes
-les plus proches dans l'ontologie (`data/ontology/ontologie_v1.csv`), par
-similarité d'embeddings ([bge-m3](https://huggingface.co/BAAI/bge-m3),
-PostgreSQL + pgvector).
+Chaque jeu non archivé de data.gouv.fr (~75k) est rattaché à l'ontologie
+(`data/ontology/ontologie_v2.csv`) de deux façons, stockées séparément :
+
+- **embeddings** : ses `k` sous-thèmes les plus proches
+  ([bge-m3](https://huggingface.co/BAAI/bge-m3), PostgreSQL + pgvector) ;
+- **mots-clés** (baseline) : la recherche par mots-clés de thème historique,
+  étendue aux sous-thèmes.
 
 Pas de seuil ni de liste noire dans le code : l'ensemble du savoir-faire métier
 se fait dans Grist, les faux amis s'écartent en enrichissant l'ontologie
-(sous-thèmes de thème `contre_exemple`).
+(sous-thèmes de thème `contre_exemple`). Règles de rédaction et évolutions :
+[JOURNAL.md](JOURNAL.md).
 
 Tout ce dont Grist a besoin est calculé en amont : fraîcheur des données
 (reconstruite depuis les exports, comme la date "Mis à jour le" de
@@ -62,13 +66,13 @@ make test
 make update      # tout, rejouable (cron)
 ```
 
-| Étape         | Rôle                                                              |
-| ------------- | ----------------------------------------------------------------- |
-| `make fetch`  | télécharge les derniers exports data.gouv.fr dans `data/catalog/` |
-| `make embed`  | synchronise ontologie, jeux, métadonnées ; embeddings manquants   |
-| `make attach` | `k` sous-thèmes les plus proches par jeu                          |
-| `make enrich` | catégorie juridique des producteurs (SIREN pas encore en cache)   |
-| `make export` | tables pour Grist dans `data/grist/`                              |
+| Étape         | Rôle                                                                   |
+| ------------- | ---------------------------------------------------------------------- |
+| `make fetch`  | télécharge les derniers exports data.gouv.fr dans `data/catalog/`      |
+| `make embed`  | synchronise ontologie, jeux, métadonnées ; embeddings manquants        |
+| `make attach` | rattachements par embeddings (`k` plus proches) et par mots-clés       |
+| `make enrich` | catégorie juridique des producteurs (SIREN pas encore en cache)        |
+| `make export` | tables pour Grist dans `data/grist/`, une de rattachements par méthode |
 
 Seuls les éléments nouveaux ou modifiés sont réembeddés.
 
