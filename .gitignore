@@ -23,7 +23,9 @@ build/
 *.dump
 
 # OS / éditeur
-.vscode/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
 .DS_Store
 
 # Notes locales
