@@ -1,5 +1,6 @@
 """Pipeline : catalogue data.gouv.fr -> embeddings -> rattachement à
-l'ontologie -> enrichissement des producteurs -> tables pour Grist.
+l'ontologie (mots-clés, baseline, puis embeddings) -> enrichissement des
+producteurs -> tables pour Grist.
 
 Chaque étape est une sous-commande, rejouable et idempotente ; `update`
 les enchaîne toutes (usage cron).
@@ -107,14 +108,14 @@ def embed(args, conn):
 
 
 def attach(args, conn):
-    print(f"Rattachement par embeddings (k={args.k})...")
-    count = PostgresDatasetMatcher(conn).attach(k=args.k)
-    print(f"{count} rattachements enregistrés")
-
-    print("Rattachement par mots-clés...")
+    print("Rattachement par mots-clés (baseline)...")
     index = KeywordIndex(read_ontology())
     matches = [m for id, text in dataset_texts(conn) for m in index.matches(id, text)]
     print(f"{save_keyword_matches(conn, matches)} rattachements enregistrés")
+
+    print(f"Rattachement par embeddings (k={args.k})...")
+    count = PostgresDatasetMatcher(conn).attach(k=args.k)
+    print(f"{count} rattachements enregistrés")
 
 
 def enrich(args, conn):
@@ -203,7 +204,7 @@ def parse_args():
     command("fetch", fetch, "Télécharge les exports data.gouv.fr", needs_db=False)
     embed_options(command("embed", embed, "Charge le catalogue et calcule les embeddings"))
     attach_options(
-        command("attach", attach, "Rattache les jeux à l'ontologie (embeddings, mots-clés)")
+        command("attach", attach, "Rattache les jeux à l'ontologie (mots-clés, embeddings)")
     )
     command("enrich", enrich, "Catégorie juridique des producteurs (SIRENE)")
     command("export", export, "Écrit les tables pour Grist dans data/grist/")

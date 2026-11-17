@@ -80,8 +80,8 @@ GRIST_DIR = DATA / "grist"
 GRIST_EXPORTS = {
     "grist_organisations": "organisations.csv",
     "grist_jeux": "jeux.csv",
-    "grist_rattachements": "rattachements_embeddings.csv",
     "grist_rattachements_mots_cles": "rattachements_mots_cles.csv",
+    "grist_rattachements": "rattachements_embeddings.csv",
 }
 GRIST_DESCRIPTION_MAX_CHARS = 1000
 
