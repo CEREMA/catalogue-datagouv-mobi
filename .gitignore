@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+dist/
+build/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Environnement
+.env
+
+# Exports data.gouv.fr (lourds, retéléchargés par `make fetch`)
+/data/catalog/
+
+# Sorties du pipeline vers Grist (régénérées par `make export`)
+/data/grist/
+
+# Dumps de la base
+*.dump
+
+# OS / éditeur
+.vscode/
+.DS_Store
+
+# Notes locales
+/tmp/
