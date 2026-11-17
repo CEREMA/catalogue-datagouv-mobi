@@ -1,0 +1,9 @@
+// Bonnes pratiques Markdown (extension VS Code markdownlint).
+// Le formatage (80 colonnes) est fait par Prettier à l'enregistrement.
+{
+  "default": true,
+  // Tableaux, blocs de code et titres ne peuvent pas être coupés
+  "MD013": { "line_length": 80, "tables": false, "code_blocks": false, "headings": false },
+  // Titres identiques autorisés dans des sections différentes
+  "MD024": { "siblings_only": true }
+}
