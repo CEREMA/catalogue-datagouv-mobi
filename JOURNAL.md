@@ -76,3 +76,11 @@ sont à appliquer dans les ontologies :
   proches de tout ce qui est local.
 - **Fusionner deux sous-thèmes** seulement si leur co-occurrence (rangs 1 à 3)
   est mesurée, et avec l'accord du client.
+
+## Paramétrage Github
+
+Mise en place des premières bonnes pratiques :
+
+- Protection de la branche main (obligation passage par PR) et forçage des
+  "squash and merge"
+- Suppression auto des branches post merge

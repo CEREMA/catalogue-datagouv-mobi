@@ -53,6 +53,9 @@ SIRENE, en cache).
 
 ## Installation
 
+Prérequis : Docker et [uv](https://docs.astral.sh/uv/)
+(`curl -LsSf https://astral.sh/uv/install.sh | sh`).
+
 ```bash
 cp .env.example .env
 make db-up       # PostgreSQL + pgvector (docker, port 5435)
