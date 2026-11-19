@@ -79,9 +79,16 @@ make update      # tout, rejouable (cron)
 
 Seuls les éléments nouveaux ou modifiés sont réembeddés.
 
-Le premier calcul complet demande un GPU mais il ne dit avoir lieu qu'une fois.
-Sur le serveur GPU : `make update` puis `make dump-db` ; en local : récupérer
-`catalogue_mobi.dump` puis `make restore-db`.
+Le premier calcul complet demande un GPU mais il ne doit avoir lieu qu'une fois.
+Seul `embed` en a besoin :
+
+```bash
+# serveur GPU
+make fetch && make embed && make dump-db
+# en local
+scp root@<serveur>:~/catalogue-datagouv-mobi/catalogue_mobi.dump .
+make restore-db && make attach && make enrich && make export
+```
 
 ## Données
 
