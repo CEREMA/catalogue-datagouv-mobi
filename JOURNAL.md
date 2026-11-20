@@ -84,3 +84,15 @@ Mise en place des premières bonnes pratiques :
 - Protection de la branche main (obligation passage par PR) et forçage des
   "squash and merge"
 - Suppression auto des branches post merge
+
+## 20/11/2026
+
+### Export allégé pour Grist
+
+L'import manuel de Grist sur l'instance gouv est limité à 30 Mo par fichier. Le
+fichier `jeux.csv` complet pèse 70 Mo dont 40 Mo environ de descriptions, même
+nettoyée. `make short-export` le raccourcit, la description est coupée à 50
+caractères et `url` est retirée (formule Grist
+`"https://www.data.gouv.fr/datasets/" + $id`). C'est une option : `make export`
+reste complet. La vraie solution reste de réduire le nombre de jeux poussés, par
+le pré-filtre « candidats mobilité ».
