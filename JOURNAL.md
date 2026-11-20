@@ -96,3 +96,19 @@ caractères et `url` est retirée (formule Grist
 `"https://www.data.gouv.fr/datasets/" + $id_jeu`). C'est une option :
 `make export` reste complet. La vraie solution reste de réduire le nombre de
 jeux poussés, par le pré-filtre « candidats mobilité ».
+
+Le document Grist a ensuite saturé la mémoire du serveur (`MemoryError`, ~370k
+lignes). `make short-export` filtre donc aussi les rattachements par embeddings
+: 2 par jeu (contre-exemples compris), seulement pour les jeux ayant un
+rattachement hors contre-exemple à moins de 0,5 ou un mot-clé trouvé. Tous les
+jeux restent dans `jeux.csv`. Rattachements : 226 764 → 81 558 lignes.
+
+### Table des rattachements toutes méthodes
+
+Grist ne sait pas créer de lignes par formule, donc pas d'union des tables par
+méthode. `rattachements.csv` la calcule (`FULL JOIN`) : une ligne par couple
+(jeu, sous-thème) proposé par au moins une méthode, avec rang et distance
+embeddings et mots-clés trouvés (vides si la méthode ne le propose pas). La
+validation manuelle est une colonne ajoutée dans Grist, conservée au réimport
+(_Update existing records_ sur `jeu` + `sous_theme`). Dans Grist, cette table
+remplace les tables par méthode.

@@ -46,7 +46,7 @@ enrich: ## Catégorie juridique des producteurs (API SIRENE, en cache)
 export: ## Écrit les tables à importer dans Grist (data/grist/)
 	$(RUN) export
 
-short-export: ## Idem, jeux.csv allégé pour l'import manuel (< 30 Mo)
+short-export: ## Idem, allégé pour l'import manuel dans Grist (taille, mémoire)
 	$(RUN) export --short
 
 update: ## Chaîne complète : fetch, embed, attach, enrich, export (cron)

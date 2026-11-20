@@ -69,14 +69,14 @@ make test
 make update      # tout, rejouable (cron)
 ```
 
-| Étape               | Rôle                                                                        |
-| ------------------- | --------------------------------------------------------------------------- |
-| `make fetch`        | télécharge les derniers exports data.gouv.fr dans `data/catalog/`           |
-| `make embed`        | synchronise ontologie, jeux, métadonnées ; embeddings manquants             |
-| `make attach`       | rattachements par mots-clés (baseline) et par embeddings (`k` plus proches) |
-| `make enrich`       | catégorie juridique des producteurs (SIREN pas encore en cache)             |
-| `make export`       | tables pour Grist dans `data/grist/`, une de rattachements par méthode      |
-| `make short-export` | idem, `jeux.csv` allégé pour l'import manuel dans Grist (< 30 Mo)           |
+| Étape               | Rôle                                                                                     |
+| ------------------- | ---------------------------------------------------------------------------------------- |
+| `make fetch`        | télécharge les derniers exports data.gouv.fr dans `data/catalog/`                        |
+| `make embed`        | synchronise ontologie, jeux, métadonnées ; embeddings manquants                          |
+| `make attach`       | rattachements par mots-clés (baseline) et par embeddings (`k` plus proches)              |
+| `make enrich`       | catégorie juridique des producteurs (SIREN pas encore en cache)                          |
+| `make export`       | tables pour Grist dans `data/grist/` : rattachements toutes méthodes, et une par méthode |
+| `make short-export` | idem, allégé pour l'import manuel dans Grist                                             |
 
 Seuls les éléments nouveaux ou modifiés sont réembeddés.
 

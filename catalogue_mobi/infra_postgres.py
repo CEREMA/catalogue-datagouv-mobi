@@ -108,6 +108,7 @@ CREATE INDEX IF NOT EXISTS idx_dataset_keyword ON dataset_keyword (dataset_id);
 # Supprimées puis recréées : CREATE OR REPLACE ne sait pas retirer une colonne.
 GRIST_VIEWS = """
 DROP VIEW IF EXISTS grist_organisations, grist_jeux_court, grist_jeux,
+    grist_couples_court, grist_couples, grist_rattachements_court,
     grist_rattachements, grist_rattachements_mots_cles;
 
 CREATE VIEW grist_organisations AS
@@ -169,6 +170,19 @@ SELECT m.dataset_id AS jeu,
        m.distance
 FROM dataset_ontology m;
 
+-- Variante allégée pour l'import manuel (mémoire de Grist) : 2 rattachements
+-- par jeu, pour les seuls jeux ayant un rattachement hors contre-exemple à
+-- moins de 0,5 ou un mot-clé trouvé
+CREATE VIEW grist_rattachements_court AS
+SELECT r.*
+FROM grist_rattachements r
+WHERE r.rang <= 2
+  AND (EXISTS (SELECT 1 FROM dataset_ontology m
+               WHERE m.dataset_id = r.jeu
+                 AND m.distance < 0.5
+                 AND m.ontology_id NOT LIKE 'contre_exemple/%')
+       OR EXISTS (SELECT 1 FROM dataset_keyword k WHERE k.dataset_id = r.jeu));
+
 CREATE VIEW grist_rattachements_mots_cles AS
 SELECT k.dataset_id AS jeu,
        k.theme,
@@ -176,6 +190,27 @@ SELECT k.dataset_id AS jeu,
        k.keywords AS mots_trouves
 FROM dataset_keyword k;
 """
+
+# Rattachements toutes méthodes : un couple (jeu, sous-thème) par ligne, proposé
+# par au moins une méthode, colonnes vides pour une méthode qui ne le propose
+# pas. Les mots-clés trouvés au seul niveau du thème n'ont pas de sous-thème.
+COUPLES_VIEW = """
+CREATE VIEW {name} AS
+SELECT coalesce(e.jeu, k.dataset_id) AS jeu,
+       coalesce(e.sous_theme, k.ontology_id) AS sous_theme,
+       e.rang AS rang_embeddings,
+       e.distance AS distance_embeddings,
+       k.keywords AS mots_cles
+FROM {embeddings} e
+FULL JOIN (SELECT dataset_id, ontology_id, keywords
+           FROM dataset_keyword
+           WHERE ontology_id IS NOT NULL) k
+       ON k.dataset_id = e.jeu AND k.ontology_id = e.sous_theme;
+"""
+GRIST_VIEWS += COUPLES_VIEW.format(name="grist_couples", embeddings="grist_rattachements")
+GRIST_VIEWS += COUPLES_VIEW.format(
+    name="grist_couples_court", embeddings="grist_rattachements_court"
+)
 
 
 def connect():
