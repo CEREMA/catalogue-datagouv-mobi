@@ -111,7 +111,7 @@ DROP VIEW IF EXISTS grist_organisations, grist_jeux_court, grist_jeux,
     grist_rattachements, grist_rattachements_mots_cles;
 
 CREATE VIEW grist_organisations AS
-SELECT o.id,
+SELECT o.id AS id_organisation,
        o.name AS nom,
        'https://www.data.gouv.fr/organizations/' || o.id AS url,
        o.badges,
@@ -136,7 +136,7 @@ LEFT JOIN categorie_juridique cj ON cj.code = s.nature_juridique
 WHERE EXISTS (SELECT 1 FROM dataset d WHERE d.organization_id = o.id);
 
 CREATE VIEW grist_jeux AS
-SELECT d.id,
+SELECT d.id AS id_jeu,
        d.label AS titre,
        d.url,
        d.organization_id AS organisation,
@@ -155,9 +155,9 @@ FROM dataset d;
 
 -- Variante allégée pour l'import manuel (Grist limite un fichier à 30 Mo) :
 -- description courte, pas d'url (formule Grist :
--- "https://www.data.gouv.fr/datasets/" + $id)
+-- "https://www.data.gouv.fr/datasets/" + $id_jeu)
 CREATE VIEW grist_jeux_court AS
-SELECT id, titre, organisation, left(description, 50) AS description,
+SELECT id_jeu, titre, organisation, left(description, 50) AS description,
        mots_cles, formats, schemas, cree_le, fiche_modifiee_le, donnees_maj_le,
        archive_le, score_qualite, reutilisations, vues
 FROM grist_jeux;

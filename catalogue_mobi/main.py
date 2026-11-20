@@ -137,7 +137,7 @@ def export(args, conn):
     GRIST_DIR.mkdir(parents=True, exist_ok=True)
     ontology = pl.DataFrame(read_ontology())
     ontology = ontology.select(
-        pl.Series("id", [ontology_id(r) for r in ontology.to_dicts()]), pl.all()
+        pl.Series("id_sous_theme", [ontology_id(r) for r in ontology.to_dicts()]), pl.all()
     )
     ontology.write_csv(GRIST_DIR / "ontologie.csv")
     print(f"ontologie.csv : {ontology.height} lignes")
