@@ -133,6 +133,14 @@ def enrich(args, conn):
         save_legal_category_labels(conn, lookup_legal_categories(codes))
 
 
+# Vues allégées de `export --short`, pour l'import manuel dans Grist
+SHORT_VIEWS = {
+    "grist_jeux": "grist_jeux_court",
+    "grist_rattachements": "grist_rattachements_court",
+    "grist_couples": "grist_couples_court",
+}
+
+
 def export(args, conn):
     GRIST_DIR.mkdir(parents=True, exist_ok=True)
     ontology = pl.DataFrame(read_ontology())
@@ -142,8 +150,8 @@ def export(args, conn):
     ontology.write_csv(GRIST_DIR / "ontologie.csv")
     print(f"ontologie.csv : {ontology.height} lignes")
     for view, filename in GRIST_EXPORTS.items():
-        if view == "grist_jeux" and getattr(args, "short", False):
-            view = "grist_jeux_court"
+        if getattr(args, "short", False) and view in SHORT_VIEWS:
+            view = SHORT_VIEWS[view]
         count = export_view(conn, view, GRIST_DIR / filename)
         print(f"{filename} : {count} lignes")
 
@@ -212,7 +220,8 @@ def parse_args():
     command("export", export, "Écrit les tables pour Grist dans data/grist/").add_argument(
         "--short",
         action="store_true",
-        help="jeux.csv allégé pour l'import manuel (description à 50 caractères, sans url)",
+        help="Version allégée pour l'import manuel : jeux.csv sans url, description à "
+        "50 caractères ; rattachements embeddings filtrés",
     )
     command("reset-db", reset_db, "Supprime et recrée les tables")
     sub = command("update", update, "Enchaîne toutes les étapes (cron)")
