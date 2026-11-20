@@ -104,9 +104,13 @@ CREATE TABLE IF NOT EXISTS dataset_keyword (
 CREATE INDEX IF NOT EXISTS idx_dataset_keyword ON dataset_keyword (dataset_id);
 """
 
-# Tables à importer dans Grist (une vue par table, colonnes en français)
+# Tables à importer dans Grist (une vue par table, colonnes en français).
+# Supprimées puis recréées : CREATE OR REPLACE ne sait pas retirer une colonne.
 GRIST_VIEWS = """
-CREATE OR REPLACE VIEW grist_organisations AS
+DROP VIEW IF EXISTS grist_organisations, grist_jeux_court, grist_jeux,
+    grist_rattachements, grist_rattachements_mots_cles;
+
+CREATE VIEW grist_organisations AS
 SELECT o.id,
        o.name AS nom,
        'https://www.data.gouv.fr/organizations/' || o.id AS url,
@@ -131,7 +135,7 @@ LEFT JOIN sirene s ON s.siren = o.siren
 LEFT JOIN categorie_juridique cj ON cj.code = s.nature_juridique
 WHERE EXISTS (SELECT 1 FROM dataset d WHERE d.organization_id = o.id);
 
-CREATE OR REPLACE VIEW grist_jeux AS
+CREATE VIEW grist_jeux AS
 SELECT d.id,
        d.label AS titre,
        d.url,
@@ -149,14 +153,23 @@ SELECT d.id,
        d.views AS vues
 FROM dataset d;
 
-CREATE OR REPLACE VIEW grist_rattachements AS
+-- Variante allégée pour l'import manuel (Grist limite un fichier à 30 Mo) :
+-- description courte, pas d'url (formule Grist :
+-- "https://www.data.gouv.fr/datasets/" + $id)
+CREATE VIEW grist_jeux_court AS
+SELECT id, titre, organisation, left(description, 50) AS description,
+       mots_cles, formats, schemas, cree_le, fiche_modifiee_le, donnees_maj_le,
+       archive_le, score_qualite, reutilisations, vues
+FROM grist_jeux;
+
+CREATE VIEW grist_rattachements AS
 SELECT m.dataset_id AS jeu,
        m.ontology_id AS sous_theme,
        m.rank AS rang,
        m.distance
 FROM dataset_ontology m;
 
-CREATE OR REPLACE VIEW grist_rattachements_mots_cles AS
+CREATE VIEW grist_rattachements_mots_cles AS
 SELECT k.dataset_id AS jeu,
        k.theme,
        k.ontology_id AS sous_theme,

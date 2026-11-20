@@ -142,6 +142,8 @@ def export(args, conn):
     ontology.write_csv(GRIST_DIR / "ontologie.csv")
     print(f"ontologie.csv : {ontology.height} lignes")
     for view, filename in GRIST_EXPORTS.items():
+        if view == "grist_jeux" and getattr(args, "short", False):
+            view = "grist_jeux_court"
         count = export_view(conn, view, GRIST_DIR / filename)
         print(f"{filename} : {count} lignes")
 
@@ -207,7 +209,11 @@ def parse_args():
         command("attach", attach, "Rattache les jeux à l'ontologie (mots-clés, embeddings)")
     )
     command("enrich", enrich, "Catégorie juridique des producteurs (SIRENE)")
-    command("export", export, "Écrit les tables pour Grist dans data/grist/")
+    command("export", export, "Écrit les tables pour Grist dans data/grist/").add_argument(
+        "--short",
+        action="store_true",
+        help="jeux.csv allégé pour l'import manuel (description à 50 caractères, sans url)",
+    )
     command("reset-db", reset_db, "Supprime et recrée les tables")
     sub = command("update", update, "Enchaîne toutes les étapes (cron)")
     embed_options(sub)
