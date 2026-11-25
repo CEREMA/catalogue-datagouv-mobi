@@ -87,6 +87,10 @@ GRIST_EXPORTS = {
     "grist_rattachements": "rattachements_embeddings.csv",
 }
 GRIST_DESCRIPTION_MAX_CHARS = 1000
+# `export --short` : rattachements par embeddings gardés (contre-exemples
+# compris) ; `attach` en calcule DEFAULT_K par jeu
+SHORT_MAX_RANK = 5
+SHORT_MAX_DISTANCE = 0.5
 
 # Modèle d'embeddings
 DEFAULT_MODEL = "BAAI/bge-m3"
@@ -98,6 +102,6 @@ DEFAULT_MAX_SEQ_LENGTH = 1024
 BGE_QUERY_INSTRUCTION = "Represent this sentence for searching relevant passages: "
 
 # Valeurs par défaut de la ligne de commande
-DEFAULT_K = 3
+DEFAULT_K = SHORT_MAX_RANK  # au moins le rang gardé par l'export allégé
 DEFAULT_ENCODE_BATCH_SIZE = 32
 DEFAULT_DB_BATCH_SIZE = 1024

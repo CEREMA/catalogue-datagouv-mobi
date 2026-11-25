@@ -189,3 +189,26 @@ mots indicatifs, `mots_cles_theme`, `contexte_requis` et `exclusions` valent «
 Contre-exemple » (un contexte introuvable, qui les neutraliserait si les règles
 les prenaient un jour en compte). Effet : les 7 contre-exemples sont réembeddés,
 les rattachements par embeddings de l'export allégé passent de 97 094 à 96 586.
+
+### Export allégé : rang et distance bornés
+
+Dans l'export allégé, un rattachement par embedding pertinent pouvait manquer :
+par exemple « Détail des zones de stationnement » a `stationnement_en_voirie` au
+rang 3 (0,331), qui était retiré par le filtre « 2 par jeu ». Les distances des
+sous-thèmes d'un même thème sont proches (0,316 à 0,340 pour ses 4 premiers) :
+le rang 1 n'est pas forcément le bon.
+
+`make attach` calcule désormais 5 sous-thèmes par jeu, et `make short-export`
+garde ceux de rang ≤ 5 **et** de distance < 0,5, contre-exemples compris (dans
+Grist, un rattachement est écarté si un contre-exemple est mieux classé). Plus
+de condition par jeu (mot-clé ou règle trouvés). Constantes `SHORT_MAX_RANK` et
+`SHORT_MAX_DISTANCE` dans `constants.py`.
+
+Le seuil de décision (0,4 pour l'instant) est dans Grist, pas dans le code.
+
+Pourquoi ne chatrge-t-on pas tout ? Pour des questions de limites de Grist. Par
+ailleurs découper l'export en plusieurs fichiers ne servirait à rien : la limite
+est double :
+
+- la mémoire du document Grist (≈ 370k lignes en tout), pas
+- la taille d'un fichier (30 Mo).

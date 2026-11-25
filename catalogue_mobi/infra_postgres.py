@@ -19,6 +19,8 @@ from catalogue_mobi.constants import (
     ONTOLOGY_TABLE,
     ORGANIZATION_TABLE,
     RULE_TABLE,
+    SHORT_MAX_DISTANCE,
+    SHORT_MAX_RANK,
     SIRENE_TABLE,
 )
 from catalogue_mobi.ports import Document, Vector
@@ -183,20 +185,6 @@ SELECT m.dataset_id AS jeu,
        round(m.distance::numeric, 3) AS distance
 FROM dataset_ontology m;
 
--- Variante allégée pour l'import manuel (mémoire de Grist) : 2 rattachements
--- par jeu, pour les seuls jeux ayant un rattachement hors contre-exemple à
--- moins de 0,5, un mot-clé ou une règle trouvés
-CREATE VIEW grist_rattachements_court AS
-SELECT r.*
-FROM grist_rattachements r
-WHERE r.rang <= 2
-  AND (EXISTS (SELECT 1 FROM dataset_ontology m
-               WHERE m.dataset_id = r.jeu
-                 AND m.distance < 0.5
-                 AND m.ontology_id NOT LIKE 'contre_exemple/%')
-       OR EXISTS (SELECT 1 FROM dataset_keyword k WHERE k.dataset_id = r.jeu)
-       OR EXISTS (SELECT 1 FROM dataset_rule g WHERE g.dataset_id = r.jeu));
-
 CREATE VIEW grist_rattachements_mots_cles AS
 SELECT k.dataset_id AS jeu,
        k.theme,
@@ -211,6 +199,17 @@ SELECT g.dataset_id AS jeu,
        g.contexte,
        g.exclus
 FROM dataset_rule g;
+"""
+
+# Variante allégée pour l'import manuel (mémoire de Grist) : rattachements de
+# rang et de distance bornés, contre-exemples compris (pour savoir dans Grist
+# si un contre-exemple est mieux classé)
+GRIST_VIEWS += f"""
+CREATE VIEW grist_rattachements_court AS
+SELECT r.*
+FROM grist_rattachements r
+WHERE r.rang <= {int(SHORT_MAX_RANK)}
+  AND r.distance < {float(SHORT_MAX_DISTANCE)};
 """
 
 # Rattachements toutes méthodes : un couple (jeu, sous-thème) par ligne, proposé
