@@ -3,7 +3,7 @@ from pathlib import Path
 DATA = Path("data")
 
 # Ontologie (source éditée à la main, cf. data/ontology/)
-ONTOLOGY_PATH = DATA / "ontology" / "ontologie_v2.csv"
+ONTOLOGY_PATH = DATA / "ontology" / "ontologie_v3.csv"
 
 # Exports du catalogue data.gouv.fr, téléchargés par `fetch` sous un nom stable
 CATALOG_DIR = DATA / "catalog"
@@ -70,6 +70,7 @@ DATASET_TABLE = "dataset"
 ORGANIZATION_TABLE = "organization"
 MATCH_TABLE = "dataset_ontology"
 KEYWORD_TABLE = "dataset_keyword"
+RULE_TABLE = "dataset_rule"
 SIRENE_TABLE = "sirene"
 LEGAL_CATEGORY_TABLE = "categorie_juridique"
 EMBEDDING_DIM = 1024  # dimension de BAAI/bge-m3
@@ -82,6 +83,7 @@ GRIST_EXPORTS = {
     "grist_jeux": "jeux.csv",
     "grist_couples": "rattachements.csv",
     "grist_rattachements_mots_cles": "rattachements_mots_cles.csv",
+    "grist_rattachements_regles": "rattachements_regles.csv",
     "grist_rattachements": "rattachements_embeddings.csv",
 }
 GRIST_DESCRIPTION_MAX_CHARS = 1000

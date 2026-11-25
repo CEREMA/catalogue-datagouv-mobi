@@ -34,15 +34,19 @@ de données du domaine mobilité/transport, puis, pour chaque thème :
 ## Principe
 
 Chaque jeu non archivé de data.gouv.fr (~75k) est rattaché à l'ontologie
-(`data/ontology/ontologie_v2.csv`) de deux façons, stockées séparément :
+(`data/ontology/ontologie_v3.csv`) de trois façons, stockées séparément :
 
 - **mots-clés** (baseline) : la recherche par mots-clés de thème historique,
   étendue aux sous-thèmes ;
+- **règles** : mots-clés discriminants (suffisent), contextuels (valent avec un
+  mot-clé du thème) et mots exclus (signalés), tous les mots d'une expression
+  devant être présents ;
 - **embeddings** : ses `k` sous-thèmes les plus proches
   ([bge-m3](https://huggingface.co/BAAI/bge-m3), PostgreSQL + pgvector).
 
-Pas de seuil ni de liste noire dans le code : l'ensemble du savoir-faire métier
-se fait dans Grist, les faux amis s'écartent en enrichissant l'ontologie
+Pas de seuil ni de filtrage dans le code : les méthodes ne sont pas agrégées,
+leurs résultats sont comparés et la règle métier se décide dans Grist. Les faux
+amis sont signalés (mots exclus) ou écartés en enrichissant l'ontologie
 (sous-thèmes de thème `contre_exemple`). Règles de rédaction et évolutions :
 [JOURNAL.md](JOURNAL.md).
 
@@ -69,14 +73,15 @@ make test
 make update      # tout, rejouable (cron)
 ```
 
-| Étape               | Rôle                                                                                     |
-| ------------------- | ---------------------------------------------------------------------------------------- |
-| `make fetch`        | télécharge les derniers exports data.gouv.fr dans `data/catalog/`                        |
-| `make embed`        | synchronise ontologie, jeux, métadonnées ; embeddings manquants                          |
-| `make attach`       | rattachements par mots-clés (baseline) et par embeddings (`k` plus proches)              |
-| `make enrich`       | catégorie juridique des producteurs (SIREN pas encore en cache)                          |
-| `make export`       | tables pour Grist dans `data/grist/` : rattachements toutes méthodes, et une par méthode |
-| `make short-export` | idem, allégé pour l'import manuel dans Grist                                             |
+| Étape                 | Rôle                                                                                     |
+| --------------------- | ---------------------------------------------------------------------------------------- |
+| `make fetch`          | télécharge les derniers exports data.gouv.fr dans `data/catalog/`                        |
+| `make embed`          | synchronise ontologie, jeux, métadonnées ; embeddings manquants                          |
+| `make embed-ontology` | idem pour la seule ontologie (sans GPU, catalogue non relu)                              |
+| `make attach`         | rattachements par mots-clés (baseline), par règles et par embeddings (`k` plus proches)  |
+| `make enrich`         | catégorie juridique des producteurs (SIREN pas encore en cache)                          |
+| `make export`         | tables pour Grist dans `data/grist/` : rattachements toutes méthodes, et une par méthode |
+| `make short-export`   | idem, allégé pour l'import manuel dans Grist                                             |
 
 Seuls les éléments nouveaux ou modifiés sont réembeddés.
 
@@ -90,6 +95,41 @@ make fetch && make embed && make dump-db
 scp root@<serveur>:~/catalogue-datagouv-mobi/catalogue_mobi.dump .
 make restore-db && make attach && make enrich && make export
 ```
+
+## Modifier l'ontologie
+
+L'ontologie est un CSV édité à la main, une ligne par sous-thème. L'id d'un
+sous-thème est `theme/sous_theme` (slugs ASCII en `snake_case`) : c'est la clé
+de jointure en base, dans les exports et des validations faites dans Grist
+(`jeu` + `sous_theme`).
+
+| Modification                                                                         | Conséquence                                                             | À relancer                     |
+| ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- | ------------------------------ |
+| Libellés (`*_label`)                                                                 | aucune                                                                  | `export`                       |
+| `mots_cles_theme`, `mots_cles_discriminants`, `mots_cles_contextuels`, `mots_exclus` | rattachements par mots-clés et règles                                   | `attach export`                |
+| `theme_description`, `description`, `mots_cles_indicatifs`                           | sous-thème réembeddé, rangs et distances changent                       | `embed-ontology attach export` |
+| Ajout d'un sous-thème                                                                | nouvel id                                                               | `embed-ontology attach export` |
+| Slug `theme` ou `sous_theme` changé, sous-thème supprimé ou fusionné                 | ancien id supprimé avec ses rattachements, validations Grist orphelines | `embed-ontology attach export` |
+
+Règles :
+
+- **`make embed-ontology`** suffit après une modification de l'ontologie : seuls
+  les sous-thèmes dont le texte a changé sont réembeddés, en une vingtaine de
+  secondes sur CPU. Les jeux de données ne sont ni relus ni réembeddés.
+- **Ne jamais renommer un slug** pour changer un intitulé : modifier le libellé.
+  Une fusion garde l'id du sous-thème qui absorbe l'autre, et la correspondance
+  ancien id → nouvel id est notée au JOURNAL pour reporter les validations dans
+  Grist.
+- **Un nouveau fichier `ontologie_vN.csv`** seulement quand les colonnes
+  changent (et `ONTOLOGY_PATH` dans `constants.py`). Sinon, modification sur
+  place : git sert d'historique.
+- **Une PR par modification métier**, avec une ligne au JOURNAL (quoi, pourquoi,
+  jeux constatés). Côté contenu, voir les règles de rédaction des descriptions
+  au JOURNAL (méthode par embeddings).
+- **Mots-clés** : séparés par des virgules, sans casse ni accents, tirets lus
+  comme des espaces, mots trouvés en début de mot avec jusqu'à deux lettres de
+  plus (pluriels). Pour les règles, une expression est trouvée si tous ses mots
+  sont présents, dans n'importe quel ordre (mots vides ignorés : de, la, du…).
 
 ## Données
 

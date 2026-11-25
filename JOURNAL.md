@@ -112,3 +112,42 @@ embeddings et mots-clés trouvés (vides si la méthode ne le propose pas). La
 validation manuelle est une colonne ajoutée dans Grist, conservée au réimport
 (_Update existing records_ sur `jeu` + `sous_theme`). Dans Grist, cette table
 remplace les tables par méthode.
+
+## 25/11/2026
+
+### Ontologie v3 et méthode par règles
+
+Premiers retours : la baseline ne trouve une expression (« tarification
+stationnement ») que si ses mots se suivent, et n'a ni mots contextuels ni mots
+à exclure. Le wiki du projet décrivait déjà deux types de mots-clés :
+discriminants (leur présence suffit) et contextuels (à associer à d'autres
+mots-clés). Tableau initial à retrouver
+
+La baseline reste inchangée Une troisième méthode, **règles**, s'appuie sur
+trois colonnes ajoutées dans `ontologie_v3.csv` (colonnes v2 inchangées, donc
+pas de réembedding) :
+
+- `mots_cles_discriminants` : rattachent seuls ;
+- `mots_cles_contextuels` : rattachent si un mot-clé du thème
+  (`mots_cles_theme`), autre qu'eux-mêmes, est aussi trouvé ;
+- `mots_exclus` : signalés dans une colonne, sans filtrage.
+
+Une expression est trouvée si tous ses mots sont présents, dans n'importe quel
+ordre. Les méthodes ne sont pas agrégées : `rattachements.csv` met côte à côte
+mots-clés, règles (`regles_discriminants`, `regles_contextuels`,
+`regles_exclus`) et embeddings, pour trouver la règle métier dans Grist.
+
+Les colonnes sont à compléter par le tableau : mots indicatifs v2 répartis entre
+discriminants et contextuels, faux amis connus en exclus. Premiers faux amis vus
+sur le catalogue complet :
+
+- « zone bleue » : zonage des PPR (2 486 jeux), en contextuel, `ppr` exclu ;
+- jeux IRVE (schéma avec « paiement », « tarification », « parking ») dans le
+  stationnement : `irve, recharge` exclus ;
+- `stationnement` en contextuel revenait à tout le thème : retiré.
+
+### Réembedding de la seule ontologie
+
+`make embed-ontology` (`embed --ontology-only`) ne traite que l'ontologie : une
+vingtaine de secondes sur CPU, essentiellement le chargement du modèle. C'est la
+commande à lancer après une modification de l'ontologie (cf. README).
