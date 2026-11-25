@@ -220,3 +220,6 @@ faisant des vlookup (type ind_embeddings) sont chèeres en calcul. Pour optimise
 on fait quand on le peut un calcul est fait à l'export : colonne
 `contre_exemple_mieux_classe` de `rattachements.csv` (vraie si un contre-exemple
 a un meilleur rang embeddings pour ce jeu, indépendante du seuil).
+
+À noter la colonne `autres_rattachements` est également très lourde en calculs,
+on l'a passée en trigger formula, à voir dans le temps si ça tient.
