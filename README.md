@@ -36,12 +36,13 @@ de données du domaine mobilité/transport, puis, pour chaque thème :
 Chaque jeu non archivé de data.gouv.fr (~75k) est rattaché à l'ontologie
 (`data/ontology/ontologie_v3.csv`) de trois façons, stockées séparément :
 
-- **mots-clés** (baseline) : la recherche par mots-clés de thème historique,
-  étendue aux sous-thèmes ;
-- **règles** (tableau de classification du client) : un terme du sous-thème
-  rattache si un mot de son contexte requis est aussi présent ; les exclusions
-  sont signalées ;
-- **embeddings** : ses `k` sous-thèmes les plus proches
+- **mots-clés** (baseline, méthode historique) : un des `mots_cles_indicatifs`
+  du sous-thème apparaît tel quel dans le jeu ;
+- **règles** (tableau de classification du client) : un des `termes` du
+  sous-thème (liste plus large) et un mot de son `contexte_requis` apparaissent
+  dans le jeu ; les `exclusions` trouvées sont signalées ;
+- **embeddings** : les `k` sous-thèmes de sens le plus proche, même sans mot
+  commun, avec leur rang et leur distance
   ([bge-m3](https://huggingface.co/BAAI/bge-m3), PostgreSQL + pgvector).
 
 Les faux amis sont signalés (mots exclus) ou écartés en enrichissant l'ontologie
@@ -64,13 +65,19 @@ flowchart TD
     R --> E["Exclusions trouvées listées<br/>dans regles_exclus, sans filtrer"]
 ```
 
-Exemple, `stationnement/tarification` : « Tarifs des parkings » est rattaché
-(terme `tarif`, contexte `parking`), « Tarifs 2024 » ne l'est pas (pas de
-contexte). Un terme est trouvé si tous ses mots sont présents, dans n'importe
-quel ordre : « tarification du stationnement » trouve « Stationnement : grille
-de tarification ».
+Exemple, `stationnement/stationnement_en_voirie` :
 
-### CIn cde vs Grist
+- « Places de parking PMR de la Ville de Saint-Brieuc » est rattaché par règle
+  (terme `places de parking`, contexte `parking`), mais pas par mot-clé : aucun
+  des 4 mots-clés (`stationnement`, `horodateur`…) n'y figure, alors que les
+  règles ont 22 termes ;
+- « Places en crèche » n'est pas rattaché : terme `places`, mais aucun mot du
+  contexte ;
+- un terme est trouvé si tous ses mots sont présents, dans n'importe quel ordre
+  (« Parking : nombre de places » trouve `places de parking`), un mot-clé
+  seulement s'il apparaît tel quel.
+
+### In code vs Grist
 
 Pas d'aller-retour : le code calcule, Grist sert à décider.
 
