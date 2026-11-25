@@ -215,6 +215,9 @@ WHERE r.rang <= {int(SHORT_MAX_RANK)}
 # Rattachements toutes méthodes : un couple (jeu, sous-thème) par ligne, proposé
 # par au moins une méthode, colonnes vides pour une méthode qui ne le propose
 # pas. Les mots-clés trouvés au seul niveau du thème n'ont pas de sous-thème.
+# `contre_exemple_mieux_classe` : un contre-exemple a un meilleur rang
+# embeddings pour ce jeu (calculé ici plutôt que par une formule Grist avec
+# lookupRecords, qui saturait la mémoire du document)
 COUPLES_VIEW = """
 CREATE VIEW {name} AS
 WITH k AS (SELECT dataset_id AS jeu, ontology_id AS sous_theme, keywords
@@ -223,6 +226,10 @@ WITH k AS (SELECT dataset_id AS jeu, ontology_id AS sous_theme, keywords
      g AS (SELECT dataset_id AS jeu, ontology_id AS sous_theme,
                   termes, contexte, exclus
            FROM dataset_rule),
+     ce AS (SELECT jeu, min(rang) AS rang
+            FROM {embeddings}
+            WHERE sous_theme LIKE 'contre_exemple/%'
+            GROUP BY jeu),
      couples AS (SELECT jeu, sous_theme FROM {embeddings}
                  UNION SELECT jeu, sous_theme FROM k
                  UNION SELECT jeu, sous_theme FROM g)
@@ -233,11 +240,13 @@ SELECT c.jeu,
        k.keywords AS mots_cles,
        g.termes AS regles_termes,
        g.contexte AS regles_contexte,
-       g.exclus AS regles_exclus
+       g.exclus AS regles_exclus,
+       coalesce(e.rang > ce.rang, false)::text AS contre_exemple_mieux_classe
 FROM couples c
 LEFT JOIN {embeddings} e USING (jeu, sous_theme)
 LEFT JOIN k USING (jeu, sous_theme)
-LEFT JOIN g USING (jeu, sous_theme);
+LEFT JOIN g USING (jeu, sous_theme)
+LEFT JOIN ce USING (jeu);
 """
 GRIST_VIEWS += COUPLES_VIEW.format(name="grist_couples", embeddings="grist_rattachements")
 GRIST_VIEWS += COUPLES_VIEW.format(

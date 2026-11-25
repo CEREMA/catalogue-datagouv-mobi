@@ -212,3 +212,11 @@ est double :
 
 - la mémoire du document Grist (≈ 370k lignes en tout), pas
 - la taille d'un fichier (30 Mo).
+
+### Soucis récurrents de mémoire
+
+Le document Grist sature régulièrement (`MemoryError`). A priori les formule
+faisant des vlookup (type ind_embeddings) sont chèeres en calcul. Pour optimiser
+on fait quand on le peut un calcul est fait à l'export : colonne
+`contre_exemple_mieux_classe` de `rattachements.csv` (vraie si un contre-exemple
+a un meilleur rang embeddings pour ce jeu, indépendante du seuil).
