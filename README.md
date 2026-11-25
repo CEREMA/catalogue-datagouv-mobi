@@ -44,16 +44,23 @@ Chaque jeu non archivé de data.gouv.fr (~75k) est rattaché à l'ontologie
 - **embeddings** : ses `k` sous-thèmes les plus proches
   ([bge-m3](https://huggingface.co/BAAI/bge-m3), PostgreSQL + pgvector).
 
-Pas de seuil ni de filtrage dans le code : les méthodes ne sont pas agrégées,
-leurs résultats sont comparés et la règle métier se décide dans Grist. Les faux
-amis sont signalés (mots exclus) ou écartés en enrichissant l'ontologie
+Les faux amis sont signalés (mots exclus) ou écartés en enrichissant l'ontologie
 (sous-thèmes de thème `contre_exemple`). Règles de rédaction et évolutions :
 [JOURNAL.md](JOURNAL.md).
 
-Tout ce dont Grist a besoin est calculé en amont : fraîcheur des données
-(reconstruite depuis les exports, comme la date "Mis à jour le" de
-data.gouv.fr), schémas déclarés, catégorie juridique des producteurs (API
-SIRENE, en cache).
+### CIn cde vs Grist
+
+Pas d'aller-retour : le code calcule, Grist sert à décider.
+
+- **Code** (rejouable) : rattachements des trois méthodes avec ce qui les a
+  déclenchés (mots trouvés, rang, distance), sans seuil, filtrage ni agrégation.
+  Données sur les jeux et producteurs : fraîcheur (comme la date "Mis à jour le"
+  de data.gouv.fr), schémas, catégorie juridique (SIRENE). CSV de `data/grist/`.
+- **Grist** (widgets et formules, pas de code versionné) : import
+  (`rattachements.csv` en _Update existing records_ sur `jeu` + `sous_theme`),
+  validation manuelle, règle métier (filtres sur distance, mots trouvés et
+  exclus), vues par domaine et sous-thème, compteurs, publication.
+- **Ontologie** : modifiée dans le CSV, par PR (voir plus bas).
 
 ## Installation
 
