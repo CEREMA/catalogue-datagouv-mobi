@@ -38,15 +38,37 @@ Chaque jeu non archivé de data.gouv.fr (~75k) est rattaché à l'ontologie
 
 - **mots-clés** (baseline) : la recherche par mots-clés de thème historique,
   étendue aux sous-thèmes ;
-- **règles** : mots-clés discriminants (suffisent), contextuels (valent avec un
-  mot-clé du thème) et mots exclus (signalés), tous les mots d'une expression
-  devant être présents ;
+- **règles** (tableau de classification du client) : un terme du sous-thème
+  rattache si un mot de son contexte requis est aussi présent ; les exclusions
+  sont signalées ;
 - **embeddings** : ses `k` sous-thèmes les plus proches
   ([bge-m3](https://huggingface.co/BAAI/bge-m3), PostgreSQL + pgvector).
 
 Les faux amis sont signalés (mots exclus) ou écartés en enrichissant l'ontologie
 (sous-thèmes de thème `contre_exemple`). Règles de rédaction et évolutions :
 [JOURNAL.md](JOURNAL.md).
+
+### Rattachement par règles
+
+Pour chaque jeu (titre, description, tags) et chaque sous-thème :
+
+```mermaid
+flowchart TD
+    J["Jeu : titre, description, tags"] --> T{"Un des termes<br/>du sous-thème trouvé ?"}
+    T -- non --> N["Pas de rattachement"]
+    T -- oui --> C{"Contexte requis<br/>renseigné ?"}
+    C -- non --> R["Rattaché"]
+    C -- oui --> M{"Un mot du contexte trouvé ?<br/>(le terme lui-même compte)"}
+    M -- non --> N
+    M -- oui --> R
+    R --> E["Exclusions trouvées listées<br/>dans regles_exclus, sans filtrer"]
+```
+
+Exemple, `stationnement/tarification` : « Tarifs des parkings » est rattaché
+(terme `tarif`, contexte `parking`), « Tarifs 2024 » ne l'est pas (pas de
+contexte). Un terme est trouvé si tous ses mots sont présents, dans n'importe
+quel ordre : « tarification du stationnement » trouve « Stationnement : grille
+de tarification ».
 
 ### CIn cde vs Grist
 
@@ -110,13 +132,13 @@ sous-thème est `theme/sous_theme` (slugs ASCII en `snake_case`) : c'est la clé
 de jointure en base, dans les exports et des validations faites dans Grist
 (`jeu` + `sous_theme`).
 
-| Modification                                                                         | Conséquence                                                             | À relancer                     |
-| ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- | ------------------------------ |
-| Libellés (`*_label`)                                                                 | aucune                                                                  | `export`                       |
-| `mots_cles_theme`, `mots_cles_discriminants`, `mots_cles_contextuels`, `mots_exclus` | rattachements par mots-clés et règles                                   | `attach export`                |
-| `theme_description`, `description`, `mots_cles_indicatifs`                           | sous-thème réembeddé, rangs et distances changent                       | `embed-ontology attach export` |
-| Ajout d'un sous-thème                                                                | nouvel id                                                               | `embed-ontology attach export` |
-| Slug `theme` ou `sous_theme` changé, sous-thème supprimé ou fusionné                 | ancien id supprimé avec ses rattachements, validations Grist orphelines | `embed-ontology attach export` |
+| Modification                                                         | Conséquence                                                             | À relancer                     |
+| -------------------------------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------ |
+| Libellés (`*_label`)                                                 | aucune                                                                  | `export`                       |
+| `mots_cles_theme`, `termes`, `contexte_requis`, `exclusions`         | rattachements par mots-clés et règles                                   | `attach export`                |
+| `theme_description`, `description`, `mots_cles_indicatifs`           | sous-thème réembeddé, rangs et distances changent                       | `embed-ontology attach export` |
+| Ajout d'un sous-thème                                                | nouvel id                                                               | `embed-ontology attach export` |
+| Slug `theme` ou `sous_theme` changé, sous-thème supprimé ou fusionné | ancien id supprimé avec ses rattachements, validations Grist orphelines | `embed-ontology attach export` |
 
 Règles :
 
@@ -133,19 +155,25 @@ Règles :
 - **Une PR par modification métier**, avec une ligne au JOURNAL (quoi, pourquoi,
   jeux constatés). Côté contenu, voir les règles de rédaction des descriptions
   au JOURNAL (méthode par embeddings).
-- **Mots-clés** : séparés par des virgules, sans casse ni accents, tirets lus
-  comme des espaces, mots trouvés en début de mot avec jusqu'à deux lettres de
-  plus (pluriels). Pour les règles, une expression est trouvée si tous ses mots
-  sont présents, dans n'importe quel ordre (mots vides ignorés : de, la, du…).
+- **Mots-clés** : sans casse ni accents, tirets lus comme des espaces, mots
+  trouvés en début de mot avec jusqu'à deux lettres de plus (pluriels).
+  Séparateur `,` dans les colonnes `mots_cles_*`, `;` dans les colonnes de
+  règles (comme le tableau source, dont des termes contiennent des virgules).
+- **Règles** : un terme est trouvé si tous ses mots sont présents, dans
+  n'importe quel ordre (mots vides et mots d'une lettre ignorés). Il rattache si
+  un mot de `contexte_requis` est trouvé (lui-même compris), ou seul si
+  `contexte_requis` est vide. Les `exclusions` trouvées sont signalées, sans
+  filtrer. Contexte et exclusions sont ceux de la catégorie du tableau source,
+  recopiés sur chacun de ses sous-thèmes.
 
 ## Données
 
-| Dossier          | Contenu                                           | Versionné |
-| ---------------- | ------------------------------------------------- | --------- |
-| `data/catalog/`  | exports data.gouv.fr                              | non       |
-| `data/ontology/` | ontologie (source éditée à la main)               | oui       |
-| `data/grist/`    | tables à importer dans Grist                      | non       |
-| `data/old/`      | sorties de l'ancienne approche (notebooks `old/`) | oui       |
+| Dossier          | Contenu                                                                                                    | Versionné |
+| ---------------- | ---------------------------------------------------------------------------------------------------------- | --------- |
+| `data/catalog/`  | exports data.gouv.fr                                                                                       | non       |
+| `data/ontology/` | ontologie (source éditée à la main)                                                                        | oui       |
+| `data/grist/`    | tables à importer dans Grist                                                                               | non       |
+| `data/old/`      | sorties de l'ancienne approche (notebooks `old/`), tableau de classification du client (source des règles) | oui       |
 
 ## Inspiration de FlowDataGouv
 

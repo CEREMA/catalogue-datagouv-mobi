@@ -151,3 +151,41 @@ sur le catalogue complet :
 `make embed-ontology` (`embed --ontology-only`) ne traite que l'ontologie : une
 vingtaine de secondes sur CPU, essentiellement le chargement du modèle. C'est la
 commande à lancer après une modification de l'ontologie (cf. README).
+
+### Tableau de classification du client dans la v3
+
+On réutilise le tableau comprenant des contre exemples afin d'alimenter la v3 de
+l'ontologie. Les termes forts et expressions ont le même rôle et sont réunis
+dans `termes`. Un terme rattache si un mot de `contexte_requis` est trouvé,
+lui-même compris (« horodateur » est terme et contexte du stationnement) ; sans
+contexte requis (socio-économie, environnement), il suffit seul. `exclusions`
+sont signalées, sans filtrer.
+
+**Structure** : 60 sous-catégories dans le tableau.
+
+- 36 rattachées à un sous-thème v2, id conservé. Fusions : `offre_planifiee` ←
+  Réseaux et lignes, Arrêts et stations, Horaires théoriques ;
+  `amenagements_cyclables` ← Aménagement cyclable, Pistes et bandes ;
+  `trafic_historique…` ← Comptages et débit, Vitesse et temps de parcours ;
+  `transport_collectif/accessibilite` ← TC › Accessibilité et Accessibilité ›
+  Accessibilité des transports (doublon du tableau).
+- 23 nouveaux sous-thèmes, dont 7 dans 4 nouveaux thèmes : `accessibilite` (les
+  deux sous-thèmes d'accessibilité existants restent dans leur thème, ids
+  conservés), `population_menages`, `territoire_equipements`, `qualite_air`.
+  Slugs, descriptions et `mots_cles_indicatifs` (termes forts du tableau)
+  rédigés par nous, **à relire par le client**.
+- 1 ligne vide ignorée : Stationnement › Places réservées PMR.
+- 8 sous-thèmes v2 absents du tableau gardés tels quels (piétons, trottinettes,
+  véhicules, IRVE, entrepôts, GES, accidentologie), contexte requis =
+  `mots_cles_theme`.
+
+**Provenance** : `termes` et `exclusions` sont repris du tableau et complétés
+(faux amis constatés : `ppr`, `irve, recharge`, `oiseaux`).
+
+**Contre-exemples** : tous leurs champs sont remplis. `theme_description` est
+embeddée : c'est une description neutre de leurs domaines, sans négation. Les
+autres champs sont ignorés par la baseline et les règles : `termes` reprend les
+mots indicatifs, `mots_cles_theme`, `contexte_requis` et `exclusions` valent «
+Contre-exemple » (un contexte introuvable, qui les neutraliserait si les règles
+les prenaient un jour en compte). Effet : les 7 contre-exemples sont réembeddés,
+les rattachements par embeddings de l'export allégé passent de 97 094 à 96 586.

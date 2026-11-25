@@ -104,13 +104,13 @@ CREATE TABLE IF NOT EXISTS dataset_keyword (
 );
 CREATE INDEX IF NOT EXISTS idx_dataset_keyword ON dataset_keyword (dataset_id);
 
--- Rattachement par règles : termes discriminants, contextuels (avec le
--- mot-clé du thème qui les valide) et mots exclus trouvés
+-- Rattachement par règles : termes, mots du contexte requis et exclusions
+-- trouvés
 CREATE TABLE IF NOT EXISTS dataset_rule (
     dataset_id TEXT NOT NULL REFERENCES dataset (id) ON DELETE CASCADE,
     ontology_id TEXT NOT NULL REFERENCES ontology (id) ON DELETE CASCADE,
-    discriminants TEXT,
-    contextuels TEXT,
+    termes TEXT,
+    contexte TEXT,
     exclus TEXT,
     PRIMARY KEY (dataset_id, ontology_id)
 );
@@ -175,7 +175,7 @@ SELECT id_jeu, titre, organisation, left(description, 50) AS description,
        archive_le, score_qualite, reutilisations, vues
 FROM grist_jeux;
 
--- Distance arrondie à 3 décimales 
+-- Distance arrondie à 3 décimales
 CREATE VIEW grist_rattachements AS
 SELECT m.dataset_id AS jeu,
        m.ontology_id AS sous_theme,
@@ -207,8 +207,8 @@ FROM dataset_keyword k;
 CREATE VIEW grist_rattachements_regles AS
 SELECT g.dataset_id AS jeu,
        g.ontology_id AS sous_theme,
-       g.discriminants,
-       g.contextuels,
+       g.termes,
+       g.contexte,
        g.exclus
 FROM dataset_rule g;
 """
@@ -222,7 +222,7 @@ WITH k AS (SELECT dataset_id AS jeu, ontology_id AS sous_theme, keywords
            FROM dataset_keyword
            WHERE ontology_id IS NOT NULL),
      g AS (SELECT dataset_id AS jeu, ontology_id AS sous_theme,
-                  discriminants, contextuels, exclus
+                  termes, contexte, exclus
            FROM dataset_rule),
      couples AS (SELECT jeu, sous_theme FROM {embeddings}
                  UNION SELECT jeu, sous_theme FROM k
@@ -232,8 +232,8 @@ SELECT c.jeu,
        e.rang AS rang_embeddings,
        e.distance AS distance_embeddings,
        k.keywords AS mots_cles,
-       g.discriminants AS regles_discriminants,
-       g.contextuels AS regles_contextuels,
+       g.termes AS regles_termes,
+       g.contexte AS regles_contexte,
        g.exclus AS regles_exclus
 FROM couples c
 LEFT JOIN {embeddings} e USING (jeu, sous_theme)
@@ -443,13 +443,13 @@ def dataset_texts(conn, batch_size: int = 5000):
 
 def save_rule_matches(conn, rows: Iterable[dict]) -> int:
     """Remplace les rattachements par règles."""
-    fields = ["dataset_id", "ontology_id", "discriminants", "contextuels", "exclus"]
+    fields = ["dataset_id", "ontology_id", "termes", "contexte", "exclus"]
     with conn.cursor() as cur:
         cur.execute("TRUNCATE dataset_rule;")
         _to_staging(cur, "staging_rule", fields, ([r[f] for f in fields] for r in rows))
         cur.execute(
-            "INSERT INTO dataset_rule (dataset_id, ontology_id, discriminants, "
-            "contextuels, exclus) SELECT * FROM staging_rule;"
+            "INSERT INTO dataset_rule (dataset_id, ontology_id, termes, contexte, exclus) "
+            "SELECT * FROM staging_rule;"
         )
         count = cur.rowcount
     conn.commit()

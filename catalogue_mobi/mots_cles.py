@@ -113,30 +113,44 @@ class KeywordIndex:
         ]
 
 
-# Mots vides ignorés dans une expression (« places de stationnement »)
-STOPWORDS = frozenset("a au aux d de des du en et l la le les ou par pour sur".split())
+# Mots vides ignorés dans un terme (« places de stationnement »), en plus des
+# mots d'une lettre (« P+R », « Vélo'v » avant fusion)
+STOPWORDS = frozenset("au aux de des du en et la le les ou par pour sur un une".split())
+
+# Séparateur des colonnes de règles : celui du tableau source, dont des termes
+# contiennent des virgules (« PM2,5 »)
+RULE_SEPARATOR = ";"
+
+
+def rule_normalize(text: str | None) -> str:
+    """`normalize`, et apostrophe supprimée à l'intérieur d'un mot de plus de
+    deux lettres (« Vélo'v » -> « velov ») ; gardée après une élision
+    (« d'arrêt » reste deux mots)."""
+    text = normalize(text).replace("\u2019", "'")
+    return re.sub(r"(?<=[a-z]{3})'(?=[a-z])", "", text)
 
 
 def _terms(cell: str | None) -> list[tuple[str, frozenset[str]]]:
-    """(terme, ses mots hors mots vides) pour chaque terme d'une cellule."""
-    terms = []
-    for term in split_keywords(cell):
-        words = frozenset(re.findall(r"[a-z0-9]+", term)) - STOPWORDS
-        if words:
-            terms.append((term, words))
-    return terms
+    """(terme, ses mots significatifs) pour chaque terme d'une cellule."""
+    terms = {}
+    for part in (cell or "").split(RULE_SEPARATOR):
+        term = rule_normalize(part).strip()
+        words = frozenset(w for w in re.findall(r"[a-z0-9]+", term) if len(w) > 1)
+        words -= STOPWORDS
+        if words and term not in terms:
+            terms[term] = words
+    return list(terms.items())
 
 
 class RuleIndex:
-    """Rattachement par règles (méthode du wiki du projet), par sous-thème :
+    """Rattachement par règles, par sous-thème (colonnes séparées par « ; ») :
 
     - un terme est trouvé si tous ses mots sont dans le texte, dans
       n'importe quel ordre (même règle de mot que la baseline) ;
-    - un mot-clé **discriminant** suffit à rattacher ;
-    - un mot-clé **contextuel** ne rattache que si un mot-clé du thème
-      (`mots_cles_theme`) est aussi trouvé, autre que lui-même ;
-    - les **mots exclus** trouvés sont signalés, sans rien filtrer : la
-      règle métier se décide dans Grist.
+    - un terme (`termes`) rattache si un mot du `contexte_requis` est aussi
+      trouvé, lui-même compris ; sans contexte requis, il suffit seul ;
+    - les `exclusions` trouvées sont signalées, sans rien filtrer : la règle
+      métier se décide dans Grist.
     """
 
     def __init__(self, ontology_rows: Iterable[dict]):
@@ -145,47 +159,34 @@ class RuleIndex:
         for row in ontology_rows:
             if row["theme"] == CONTRE_EXEMPLE:
                 continue
-            columns = [
-                _terms(row.get(c))
-                for c in (
-                    "mots_cles_theme",
-                    "mots_cles_discriminants",
-                    "mots_cles_contextuels",
-                    "mots_exclus",
-                )
-            ]
+            columns = [_terms(row.get(c)) for c in ("termes", "contexte_requis", "exclusions")]
             words.update(w for terms in columns for _, ws in terms for w in ws)
             self._sous_themes.append((f"{row['theme']}/{row['sous_theme']}", *columns))
         self._finder = KeywordFinder(words)
 
     def matches(self, dataset_id: str, text: str) -> list[dict]:
-        """Un rattachement par sous-thème trouvé, avec les termes qui l'ont
-        déclenché et les mots exclus présents."""
-        found = self._finder.find(normalize(text))
+        """Un rattachement par sous-thème trouvé, avec les termes et le
+        contexte qui l'ont déclenché et les exclusions présentes."""
+        found = self._finder.find(rule_normalize(text))
 
         def present(terms):
-            return [(t, ws) for t, ws in terms if ws <= found]
+            return sorted(t for t, ws in terms if ws <= found)
 
         result = []
-        for ontology_id, theme, discriminants, contextuels, exclus in self._sous_themes:
-            theme_found = present(theme)
-            contexts = []
-            for term, ws in present(contextuels):
-                support = sorted(t for t, tws in theme_found if not tws <= ws)
-                if support:
-                    contexts.append(f"{term} (+ {', '.join(support)})")
-            discriminants_found = present(discriminants)
-            if not (discriminants_found or contexts):
+        for ontology_id, termes, contexte, exclusions in self._sous_themes:
+            termes_found = present(termes)
+            if not termes_found:
+                continue
+            contexte_found = present(contexte)
+            if contexte and not contexte_found:
                 continue
             result.append(
                 {
                     "dataset_id": dataset_id,
                     "ontology_id": ontology_id,
-                    "discriminants": ", ".join(
-                        sorted(t for t, _ in discriminants_found)
-                    ),
-                    "contextuels": "; ".join(sorted(contexts)),
-                    "exclus": ", ".join(sorted(t for t, _ in present(exclus))),
+                    "termes": "; ".join(termes_found),
+                    "contexte": "; ".join(contexte_found),
+                    "exclus": "; ".join(present(exclusions)),
                 }
             )
         return sorted(result, key=lambda m: m["ontology_id"])
