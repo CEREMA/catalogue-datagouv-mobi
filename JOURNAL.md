@@ -112,3 +112,103 @@ embeddings et mots-clés trouvés (vides si la méthode ne le propose pas). La
 validation manuelle est une colonne ajoutée dans Grist, conservée au réimport
 (_Update existing records_ sur `jeu` + `sous_theme`). Dans Grist, cette table
 remplace les tables par méthode.
+
+## 25/11/2026
+
+### Ontologie v3 et méthode par règles
+
+Premiers retours : la baseline ne trouve une expression (« tarification
+stationnement ») que si ses mots se suivent, et n'a ni mots contextuels ni mots
+à exclure. Le wiki du projet décrivait déjà deux types de mots-clés :
+discriminants (leur présence suffit) et contextuels (à associer à d'autres
+mots-clés). Tableau initial à retrouver
+
+La baseline reste inchangée Une troisième méthode, **règles**, s'appuie sur
+trois colonnes ajoutées dans `ontologie_v3.csv` (colonnes v2 inchangées, donc
+pas de réembedding) :
+
+- `mots_cles_discriminants` : rattachent seuls ;
+- `mots_cles_contextuels` : rattachent si un mot-clé du thème
+  (`mots_cles_theme`), autre qu'eux-mêmes, est aussi trouvé ;
+- `mots_exclus` : signalés dans une colonne, sans filtrage.
+
+Une expression est trouvée si tous ses mots sont présents, dans n'importe quel
+ordre. Les méthodes ne sont pas agrégées : `rattachements.csv` met côte à côte
+mots-clés, règles (`regles_discriminants`, `regles_contextuels`,
+`regles_exclus`) et embeddings, pour trouver la règle métier dans Grist.
+
+Les colonnes sont à compléter par le tableau : mots indicatifs v2 répartis entre
+discriminants et contextuels, faux amis connus en exclus. Premiers faux amis vus
+sur le catalogue complet :
+
+- « zone bleue » : zonage des PPR (2 486 jeux), en contextuel, `ppr` exclu ;
+- jeux IRVE (schéma avec « paiement », « tarification », « parking ») dans le
+  stationnement : `irve, recharge` exclus ;
+- `stationnement` en contextuel revenait à tout le thème : retiré.
+
+### Réembedding de la seule ontologie
+
+`make embed-ontology` (`embed --ontology-only`) ne traite que l'ontologie : une
+vingtaine de secondes sur CPU, essentiellement le chargement du modèle. C'est la
+commande à lancer après une modification de l'ontologie (cf. README).
+
+### Tableau de classification du client dans la v3
+
+On réutilise le tableau comprenant des contre exemples afin d'alimenter la v3 de
+l'ontologie. Les termes forts et expressions ont le même rôle et sont réunis
+dans `termes`. Un terme rattache si un mot de `contexte_requis` est trouvé,
+lui-même compris (« horodateur » est terme et contexte du stationnement) ; sans
+contexte requis (socio-économie, environnement), il suffit seul. `exclusions`
+sont signalées, sans filtrer.
+
+**Structure** : 60 sous-catégories dans le tableau.
+
+- 36 rattachées à un sous-thème v2, id conservé. Fusions : `offre_planifiee` ←
+  Réseaux et lignes, Arrêts et stations, Horaires théoriques ;
+  `amenagements_cyclables` ← Aménagement cyclable, Pistes et bandes ;
+  `trafic_historique…` ← Comptages et débit, Vitesse et temps de parcours ;
+  `transport_collectif/accessibilite` ← TC › Accessibilité et Accessibilité ›
+  Accessibilité des transports (doublon du tableau).
+- 23 nouveaux sous-thèmes, dont 7 dans 4 nouveaux thèmes : `accessibilite` (les
+  deux sous-thèmes d'accessibilité existants restent dans leur thème, ids
+  conservés), `population_menages`, `territoire_equipements`, `qualite_air`.
+  Slugs, descriptions et `mots_cles_indicatifs` (termes forts du tableau)
+  rédigés par nous, **à relire par le client**.
+- 1 ligne vide ignorée : Stationnement › Places réservées PMR.
+- 8 sous-thèmes v2 absents du tableau gardés tels quels (piétons, trottinettes,
+  véhicules, IRVE, entrepôts, GES, accidentologie), contexte requis =
+  `mots_cles_theme`.
+
+**Provenance** : `termes` et `exclusions` sont repris du tableau et complétés
+(faux amis constatés : `ppr`, `irve, recharge`, `oiseaux`).
+
+**Contre-exemples** : tous leurs champs sont remplis. `theme_description` est
+embeddée : c'est une description neutre de leurs domaines, sans négation. Les
+autres champs sont ignorés par la baseline et les règles : `termes` reprend les
+mots indicatifs, `mots_cles_theme`, `contexte_requis` et `exclusions` valent «
+Contre-exemple » (un contexte introuvable, qui les neutraliserait si les règles
+les prenaient un jour en compte). Effet : les 7 contre-exemples sont réembeddés,
+les rattachements par embeddings de l'export allégé passent de 97 094 à 96 586.
+
+### Export allégé : rang et distance bornés
+
+Dans l'export allégé, un rattachement par embedding pertinent pouvait manquer :
+par exemple « Détail des zones de stationnement » a `stationnement_en_voirie` au
+rang 3 (0,331), qui était retiré par le filtre « 2 par jeu ». Les distances des
+sous-thèmes d'un même thème sont proches (0,316 à 0,340 pour ses 4 premiers) :
+le rang 1 n'est pas forcément le bon.
+
+`make attach` calcule désormais 5 sous-thèmes par jeu, et `make short-export`
+garde ceux de rang ≤ 5 **et** de distance < 0,5, contre-exemples compris (dans
+Grist, un rattachement est écarté si un contre-exemple est mieux classé). Plus
+de condition par jeu (mot-clé ou règle trouvés). Constantes `SHORT_MAX_RANK` et
+`SHORT_MAX_DISTANCE` dans `constants.py`.
+
+Le seuil de décision (0,4 pour l'instant) est dans Grist, pas dans le code.
+
+Pourquoi ne chatrge-t-on pas tout ? Pour des questions de limites de Grist. Par
+ailleurs découper l'export en plusieurs fichiers ne servirait à rien : la limite
+est double :
+
+- la mémoire du document Grist (≈ 370k lignes en tout), pas
+- la taille d'un fichier (30 Mo).

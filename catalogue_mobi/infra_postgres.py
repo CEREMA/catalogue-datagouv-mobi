@@ -18,6 +18,9 @@ from catalogue_mobi.constants import (
     MATCH_TABLE,
     ONTOLOGY_TABLE,
     ORGANIZATION_TABLE,
+    RULE_TABLE,
+    SHORT_MAX_DISTANCE,
+    SHORT_MAX_RANK,
     SIRENE_TABLE,
 )
 from catalogue_mobi.ports import Document, Vector
@@ -102,6 +105,17 @@ CREATE TABLE IF NOT EXISTS dataset_keyword (
     keywords TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_dataset_keyword ON dataset_keyword (dataset_id);
+
+-- Rattachement par règles : termes, mots du contexte requis et exclusions
+-- trouvés
+CREATE TABLE IF NOT EXISTS dataset_rule (
+    dataset_id TEXT NOT NULL REFERENCES dataset (id) ON DELETE CASCADE,
+    ontology_id TEXT NOT NULL REFERENCES ontology (id) ON DELETE CASCADE,
+    termes TEXT,
+    contexte TEXT,
+    exclus TEXT,
+    PRIMARY KEY (dataset_id, ontology_id)
+);
 """
 
 # Tables à importer dans Grist (une vue par table, colonnes en français).
@@ -109,7 +123,7 @@ CREATE INDEX IF NOT EXISTS idx_dataset_keyword ON dataset_keyword (dataset_id);
 GRIST_VIEWS = """
 DROP VIEW IF EXISTS grist_organisations, grist_jeux_court, grist_jeux,
     grist_couples_court, grist_couples, grist_rattachements_court,
-    grist_rattachements, grist_rattachements_mots_cles;
+    grist_rattachements, grist_rattachements_mots_cles, grist_rattachements_regles;
 
 CREATE VIEW grist_organisations AS
 SELECT o.id AS id_organisation,
@@ -163,25 +177,13 @@ SELECT id_jeu, titre, organisation, left(description, 50) AS description,
        archive_le, score_qualite, reutilisations, vues
 FROM grist_jeux;
 
+-- Distance arrondie à 3 décimales
 CREATE VIEW grist_rattachements AS
 SELECT m.dataset_id AS jeu,
        m.ontology_id AS sous_theme,
        m.rank AS rang,
-       m.distance
+       round(m.distance::numeric, 3) AS distance
 FROM dataset_ontology m;
-
--- Variante allégée pour l'import manuel (mémoire de Grist) : 2 rattachements
--- par jeu, pour les seuls jeux ayant un rattachement hors contre-exemple à
--- moins de 0,5 ou un mot-clé trouvé
-CREATE VIEW grist_rattachements_court AS
-SELECT r.*
-FROM grist_rattachements r
-WHERE r.rang <= 2
-  AND (EXISTS (SELECT 1 FROM dataset_ontology m
-               WHERE m.dataset_id = r.jeu
-                 AND m.distance < 0.5
-                 AND m.ontology_id NOT LIKE 'contre_exemple/%')
-       OR EXISTS (SELECT 1 FROM dataset_keyword k WHERE k.dataset_id = r.jeu));
 
 CREATE VIEW grist_rattachements_mots_cles AS
 SELECT k.dataset_id AS jeu,
@@ -189,6 +191,25 @@ SELECT k.dataset_id AS jeu,
        k.ontology_id AS sous_theme,
        k.keywords AS mots_trouves
 FROM dataset_keyword k;
+
+CREATE VIEW grist_rattachements_regles AS
+SELECT g.dataset_id AS jeu,
+       g.ontology_id AS sous_theme,
+       g.termes,
+       g.contexte,
+       g.exclus
+FROM dataset_rule g;
+"""
+
+# Variante allégée pour l'import manuel (mémoire de Grist) : rattachements de
+# rang et de distance bornés, contre-exemples compris (pour savoir dans Grist
+# si un contre-exemple est mieux classé)
+GRIST_VIEWS += f"""
+CREATE VIEW grist_rattachements_court AS
+SELECT r.*
+FROM grist_rattachements r
+WHERE r.rang <= {int(SHORT_MAX_RANK)}
+  AND r.distance < {float(SHORT_MAX_DISTANCE)};
 """
 
 # Rattachements toutes méthodes : un couple (jeu, sous-thème) par ligne, proposé
@@ -196,16 +217,27 @@ FROM dataset_keyword k;
 # pas. Les mots-clés trouvés au seul niveau du thème n'ont pas de sous-thème.
 COUPLES_VIEW = """
 CREATE VIEW {name} AS
-SELECT coalesce(e.jeu, k.dataset_id) AS jeu,
-       coalesce(e.sous_theme, k.ontology_id) AS sous_theme,
+WITH k AS (SELECT dataset_id AS jeu, ontology_id AS sous_theme, keywords
+           FROM dataset_keyword
+           WHERE ontology_id IS NOT NULL),
+     g AS (SELECT dataset_id AS jeu, ontology_id AS sous_theme,
+                  termes, contexte, exclus
+           FROM dataset_rule),
+     couples AS (SELECT jeu, sous_theme FROM {embeddings}
+                 UNION SELECT jeu, sous_theme FROM k
+                 UNION SELECT jeu, sous_theme FROM g)
+SELECT c.jeu,
+       c.sous_theme,
        e.rang AS rang_embeddings,
        e.distance AS distance_embeddings,
-       k.keywords AS mots_cles
-FROM {embeddings} e
-FULL JOIN (SELECT dataset_id, ontology_id, keywords
-           FROM dataset_keyword
-           WHERE ontology_id IS NOT NULL) k
-       ON k.dataset_id = e.jeu AND k.ontology_id = e.sous_theme;
+       k.keywords AS mots_cles,
+       g.termes AS regles_termes,
+       g.contexte AS regles_contexte,
+       g.exclus AS regles_exclus
+FROM couples c
+LEFT JOIN {embeddings} e USING (jeu, sous_theme)
+LEFT JOIN k USING (jeu, sous_theme)
+LEFT JOIN g USING (jeu, sous_theme);
 """
 GRIST_VIEWS += COUPLES_VIEW.format(name="grist_couples", embeddings="grist_rattachements")
 GRIST_VIEWS += COUPLES_VIEW.format(
@@ -224,6 +256,7 @@ def connect():
 
 
 ALL_TABLES = (
+    RULE_TABLE,
     KEYWORD_TABLE,
     MATCH_TABLE,
     ONTOLOGY_TABLE,
@@ -405,6 +438,21 @@ def dataset_texts(conn, batch_size: int = 5000):
         cur.itersize = batch_size
         cur.execute("SELECT id, text FROM dataset ORDER BY id;")
         yield from cur
+
+
+def save_rule_matches(conn, rows: Iterable[dict]) -> int:
+    """Remplace les rattachements par règles."""
+    fields = ["dataset_id", "ontology_id", "termes", "contexte", "exclus"]
+    with conn.cursor() as cur:
+        cur.execute("TRUNCATE dataset_rule;")
+        _to_staging(cur, "staging_rule", fields, ([r[f] for f in fields] for r in rows))
+        cur.execute(
+            "INSERT INTO dataset_rule (dataset_id, ontology_id, termes, contexte, exclus) "
+            "SELECT * FROM staging_rule;"
+        )
+        count = cur.rowcount
+    conn.commit()
+    return count
 
 
 def save_keyword_matches(conn, rows: Iterable[dict]) -> int:

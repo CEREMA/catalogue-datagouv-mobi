@@ -1,5 +1,5 @@
 """Pipeline : catalogue data.gouv.fr -> embeddings -> rattachement à
-l'ontologie (mots-clés, baseline, puis embeddings) -> enrichissement des
+l'ontologie (mots-clés baseline, règles, embeddings) -> enrichissement des
 producteurs -> tables pour Grist.
 
 Chaque étape est une sous-commande, rejouable et idempotente ; `update`
@@ -41,6 +41,7 @@ from catalogue_mobi.infra_postgres import (
     missing_sirens,
     save_classifications,
     save_keyword_matches,
+    save_rule_matches,
     save_legal_category_labels,
     save_sirens,
     update_dataset_metadata,
@@ -49,7 +50,7 @@ from catalogue_mobi.infra_postgres import (
     update_resource_stats,
 )
 from catalogue_mobi.infra_sirene import lookup_legal_categories, lookup_sirens
-from catalogue_mobi.mots_cles import KeywordIndex
+from catalogue_mobi.mots_cles import KeywordIndex, RuleIndex
 from catalogue_mobi.pipeline import (
     dataset_documents,
     dataset_metadata,
@@ -75,6 +76,24 @@ def embed(args, conn):
     ontology_store.sync(ontology)
     ontology_store.delete_except({doc.id for doc in ontology})
 
+    if not args.ontology_only:
+        sync_datasets(args, conn, dataset_store)
+
+    from catalogue_mobi.infra_embedder import SentenceTransformerEmbedder
+
+    embedder = SentenceTransformerEmbedder(
+        args.model,
+        max_seq_length=args.max_seq_length,
+        batch_size=args.encode_batch_size,
+    )
+    print("Embeddings de l'ontologie...")
+    embed_pending(ontology_store, embedder, batch_size=args.db_batch_size)
+    if not args.ontology_only:
+        print("Embeddings des jeux de données...")
+        embed_pending(dataset_store, embedder, batch_size=args.db_batch_size)
+
+
+def sync_datasets(args, conn, dataset_store):
     print("Chargement des jeux de données...")
     rows = read_datasets()
     if args.limit:
@@ -94,24 +113,17 @@ def embed(args, conn):
         print("Lecture des ressources (fraîcheur des données, schémas)...")
         print(f"{update_resource_stats(conn, read_resource_stats())} jeux mis à jour")
 
-    from catalogue_mobi.infra_embedder import SentenceTransformerEmbedder
-
-    embedder = SentenceTransformerEmbedder(
-        args.model,
-        max_seq_length=args.max_seq_length,
-        batch_size=args.encode_batch_size,
-    )
-    print("Embeddings de l'ontologie...")
-    embed_pending(ontology_store, embedder, batch_size=args.db_batch_size)
-    print("Embeddings des jeux de données...")
-    embed_pending(dataset_store, embedder, batch_size=args.db_batch_size)
-
 
 def attach(args, conn):
-    print("Rattachement par mots-clés (baseline)...")
-    index = KeywordIndex(read_ontology())
-    matches = [m for id, text in dataset_texts(conn) for m in index.matches(id, text)]
-    print(f"{save_keyword_matches(conn, matches)} rattachements enregistrés")
+    print("Rattachement par mots-clés (baseline) et par règles...")
+    ontology = read_ontology()
+    keyword_index, rule_index = KeywordIndex(ontology), RuleIndex(ontology)
+    keywords, rules = [], []
+    for id, text in dataset_texts(conn):
+        keywords += keyword_index.matches(id, text)
+        rules += rule_index.matches(id, text)
+    print(f"{save_keyword_matches(conn, keywords)} rattachements par mots-clés")
+    print(f"{save_rule_matches(conn, rules)} rattachements par règles")
 
     print(f"Rattachement par embeddings (k={args.k})...")
     count = PostgresDatasetMatcher(conn).attach(k=args.k)
@@ -178,6 +190,11 @@ def parse_args():
         return sub
 
     def embed_options(sub):
+        sub.add_argument(
+            "--ontology-only",
+            action="store_true",
+            help="Ne traite que l'ontologie : catalogue ni relu ni réembeddé (sans GPU)",
+        )
         sub.add_argument("--limit", type=int, help="Ne charge que N jeux (essai)")
         sub.add_argument(
             "--with-archived",
@@ -214,7 +231,7 @@ def parse_args():
     command("fetch", fetch, "Télécharge les exports data.gouv.fr", needs_db=False)
     embed_options(command("embed", embed, "Charge le catalogue et calcule les embeddings"))
     attach_options(
-        command("attach", attach, "Rattache les jeux à l'ontologie (mots-clés, embeddings)")
+        command("attach", attach, "Rattache les jeux à l'ontologie (mots-clés, règles, embeddings)")
     )
     command("enrich", enrich, "Catégorie juridique des producteurs (SIRENE)")
     command("export", export, "Écrit les tables pour Grist dans data/grist/").add_argument(

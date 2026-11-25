@@ -37,7 +37,10 @@ fetch: ## Télécharge les derniers exports du catalogue data.gouv.fr
 embed: ## Charge le catalogue, calcule les embeddings manquants (reprise possible)
 	$(RUN) embed
 
-attach: ## Rattachements par mots-clés (baseline) et par embeddings (k plus proches)
+embed-ontology: ## Réembedde la seule ontologie (à utiliser sans GPU)
+	$(RUN) embed --ontology-only
+
+attach: ## Rattachements par mots-clés (baseline), par règles et par embeddings (k plus proches)
 	$(RUN) attach
 
 enrich: ## Catégorie juridique des producteurs (API SIRENE, en cache)
