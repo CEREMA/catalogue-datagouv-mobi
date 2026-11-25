@@ -175,11 +175,12 @@ SELECT id_jeu, titre, organisation, left(description, 50) AS description,
        archive_le, score_qualite, reutilisations, vues
 FROM grist_jeux;
 
+-- Distance arrondie à 3 décimales 
 CREATE VIEW grist_rattachements AS
 SELECT m.dataset_id AS jeu,
        m.ontology_id AS sous_theme,
        m.rank AS rang,
-       m.distance
+       round(m.distance::numeric, 3) AS distance
 FROM dataset_ontology m;
 
 -- Variante allégée pour l'import manuel (mémoire de Grist) : 2 rattachements
